@@ -134,6 +134,22 @@ def dislike_and_skip(client):
     return 'Removed from Liked Songs and requested next track.'
 
 
+def fast_forward_15s(client):
+    state = client.playback()
+    track(state)
+    device = state.get('device') or {}
+    if not device.get('id') or device.get('is_restricted'):
+        raise RuntimeError('The active Spotify device cannot be controlled. Nothing changed.')
+    if (state.get('actions') or {}).get('disallows', {}).get('seeking'):
+        raise RuntimeError('Spotify does not allow fast forwarding right now. Nothing changed.')
+    progress = state.get('progress_ms')
+    if type(progress) is not int or progress < 0:
+        raise RuntimeError('Spotify did not return a valid playback position. Nothing changed.')
+    client.api('PUT', '/me/player/seek',
+               {'position_ms': progress + 15000, 'device_id': device['id']})
+    return 'Requested fast forward by 15 seconds.'
+
+
 def authorize(client):
     verifier = secrets.token_urlsafe(64)
     state = secrets.token_urlsafe(32)
@@ -187,8 +203,10 @@ def authorize(client):
 
 def main():
     parser = argparse.ArgumentParser(description='Spotify controls for macOS and Logitech+ shortcuts.')
-    parser.add_argument('action', choices=['auth', 'like', 'dislike-and-skip'],
-                        help='authorize access, save the current song, or remove it and skip')
+    handlers = {'like': like, 'dislike-and-skip': dislike_and_skip,
+                'fast-forward-15s': fast_forward_15s}
+    parser.add_argument('action', choices=['auth', *handlers],
+                        help='authorize access, save the current song, remove it and skip, or fast forward 15 seconds')
     args = parser.parse_args()
     DATA.mkdir(parents=True, exist_ok=True, mode=0o700)
     with (DATA / 'action.lock').open('a') as lock:
@@ -205,7 +223,7 @@ def main():
                 if stamp.exists() and time.time() - json.loads(stamp.read_text()) < 2:
                     return 0
                 write_private(stamp, time.time())
-                message = like(client) if args.action == 'like' else dislike_and_skip(client)
+                message = handlers[args.action](client)
             print(message)
             return 0
         except Exception as error:

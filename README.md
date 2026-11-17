@@ -6,6 +6,7 @@ My custom controls for Spotify on macOS.
 
 - **Like:** Save the current song to Liked Songs.
 - **Dislike and Skip:** Remove the current song from Liked Songs and skip to the next track.
+- **Fast Forward 15s:** Fast forward 15 seconds in the current song.
 
 ## Setup
 
@@ -37,12 +38,14 @@ Trigger actions from command line:
 ```sh
 python3 spotify_actions.py like
 python3 spotify_actions.py dislike-and-skip
+python3 spotify_actions.py fast-forward-15s
 ```
 
 Trigger actions by opening the corresponding app:
 
 - `Spotify Like.app`
 - `Spotify Dislike and Skip.app`
+- `Spotify Fast Forward 15s.app`
 
 ## Development
 

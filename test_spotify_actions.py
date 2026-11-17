@@ -14,6 +14,39 @@ def playing(uri='spotify:track:one', device='mac'):
 
 
 class Tests(unittest.TestCase):
+    def test_fast_forward_15s_seeks_on_active_device_without_changing_library(self):
+        for progress, is_playing in [(0, True), (10000, False), (199000, True)]:
+            with self.subTest(progress=progress, is_playing=is_playing):
+                client = Mock()
+                client.playback.return_value = {**playing(), 'progress_ms': progress,
+                                                'is_playing': is_playing}
+                actions.fast_forward_15s(client)
+                self.assertEqual(client.mock_calls, [call.playback(),
+                    call.api('PUT', '/me/player/seek',
+                             {'position_ms': progress + 15000, 'device_id': 'mac'})])
+
+    def test_fast_forward_15s_rejects_unavailable_or_restricted_playback(self):
+        states = [None, {**playing(), 'device': None},
+                  {**playing(), 'device': {'id': 'mac', 'is_restricted': True}},
+                  {**playing(), 'actions': {'disallows': {'seeking': True}}}]
+        states += [{**playing(), 'progress_ms': value} for value in [None, -1, '1000', True]]
+        for state in states:
+            with self.subTest(state=state):
+                client = Mock()
+                client.playback.return_value = state
+                with self.assertRaises(RuntimeError):
+                    actions.fast_forward_15s(client)
+                client.api.assert_not_called()
+
+    def test_fast_forward_15s_command_dispatch_and_duplicate_suppression(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(actions, 'DATA', Path(directory)), patch.object(actions, 'Spotify'), \
+                 patch.object(actions, 'fast_forward_15s', return_value='Fast forward requested') as fast_forward, \
+                 patch('sys.argv', ['spotify_actions.py', 'fast-forward-15s']):
+                self.assertEqual(actions.main(), 0)
+                self.assertEqual(actions.main(), 0)
+                fast_forward.assert_called_once()
+
     def test_removal_is_verified_before_skip(self):
         client = Mock()
         client.playback.side_effect = [playing(), playing()]
@@ -83,7 +116,7 @@ class Tests(unittest.TestCase):
     def test_unsupported_tracks_do_nothing(self):
         for state in [None, {'item': {'type': 'episode', 'uri': 'spotify:episode:one'}},
                       {'item': {'type': 'track', 'uri': 'spotify:track:one', 'is_local': True}}]:
-            for action in [actions.like, actions.dislike_and_skip]:
+            for action in [actions.like, actions.dislike_and_skip, actions.fast_forward_15s]:
                 client = Mock()
                 client.playback.return_value = state
                 with self.assertRaises(RuntimeError):

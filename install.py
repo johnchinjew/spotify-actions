@@ -5,7 +5,8 @@ import sys
 
 def main():
     source = pathlib.Path(__file__).resolve().parent / 'spotify_actions.py'
-    for name, action in [('Spotify Like', 'like'), ('Spotify Dislike and Skip', 'dislike-and-skip')]:
+    for name, action in [('Spotify Like', 'like'), ('Spotify Dislike and Skip', 'dislike-and-skip'),
+                         ('Spotify Fast Forward 15s', 'fast-forward-15s')]:
         app = pathlib.Path.home() / f'Applications/{name}.app'
         contents = app / 'Contents'
         (contents / 'MacOS').mkdir(parents=True, exist_ok=True)
